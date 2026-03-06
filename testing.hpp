@@ -61,6 +61,8 @@ namespace testing_framework {
 
         return c;
     }
+
+    // here where the imediatly invoked lambda get called in each Tu and push the tests in a global static map
     [[maybe_unused]] static size_t TU_tests_count = [](){ return collect_tests(); }();
 
     inline auto print_tests() -> void {
@@ -179,6 +181,7 @@ namespace testing_framework {
         return total_failed == 0;
     }
 
+    // calling main in one of your TUs only
     inline int main(int argc, char** argv) {
         if(argc > 1 && std::strcmp(argv[1], "--list") == 0){
             print_tests();
