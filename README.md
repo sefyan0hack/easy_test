@@ -4,9 +4,7 @@
 
 # ⚙️ Requirements
 
-- GCC trunk build with reflection enabled
-- C++26 support
-- Compile with:
+- GCC 16 / Clang bloomberg p2996 fork
 
 ---
 

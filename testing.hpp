@@ -8,10 +8,10 @@
 #include <meta>
 #include <ranges>
 #include <tuple>
+#include <chrono>
 
-//TODO: time testcases
 //TODO: improve formatting 
-//TODO: maybe add  more features
+//TODO: maybe add more features
 
 namespace tests {}
 
@@ -23,7 +23,7 @@ namespace testing_framework {
     constexpr char const* COLOR_BOLD   = "\x1b[1m";
     constexpr char const* COLOR_RESET  = "\x1b[0m";
 
-    constexpr std::string_view SEP = "========================================";
+    constexpr std::string_view SEP = "=====================================================";
 
     inline std::function<void(const char*)> current_yield = nullptr;
     using TestFuncType = std::function<void(void)>;
@@ -96,11 +96,15 @@ namespace testing_framework {
             }
             std::printf("\t%s%zu) %s%s\n", COLOR_YELLOW, failed, e, COLOR_RESET);
         };
+    
+        const auto t0 = std::chrono::steady_clock::now();
 
         casefunc();
 
+        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
+
         if (!failed) {
-            std::printf("%s[passed]%s\n", COLOR_GREEN, COLOR_RESET);
+            std::printf("%s[passed] (%lld ms)%s\n", COLOR_GREEN, ms, COLOR_RESET);
             return true;
         }
 
@@ -144,9 +148,17 @@ namespace testing_framework {
 
     inline auto run_all() -> bool {
 
+        std::string text = "TESTS";
+        int sep_len = static_cast<int>(SEP.length());
+        int text_len = static_cast<int>(text.length());
+        
+        int padding = (sep_len > text_len) ? (sep_len - text_len) / 2 : 0;
+
         std::puts("");
         std::printf("%s%s%s\n", COLOR_BOLD, SEP.data(), COLOR_RESET);
-        std::printf("%s  UNIT TESTS  %s\n", COLOR_BOLD, COLOR_RESET);
+
+        std::printf("%s%*s%s%s\n", COLOR_BOLD, padding, "", text.c_str(), COLOR_RESET);
+        
         std::printf("%s%s%s\n\n", COLOR_BOLD, SEP.data(), COLOR_RESET);
 
         std::size_t total_suites = 0;
@@ -175,13 +187,15 @@ namespace testing_framework {
 
         // Summary footer
         std::printf("%s%s%s\n", COLOR_BOLD, SEP.data(), COLOR_RESET);
-        const char* fail_color = total_failed ? COLOR_RED : COLOR_GREEN;
-        std::printf("Suites: %zu   Cases: %zu   %sFailures: %zu%s\n",
-                    total_suites,
-                    total_cases,
-                    fail_color,
-                    total_failed,
-                    COLOR_RESET);
+        std::printf("Suites: %zu   Cases: %zu   %sSuccesses: %zu   %sFailures: %zu%s\n",
+                total_suites,
+                total_cases,
+                COLOR_GREEN,
+                total_cases - total_failed,
+                COLOR_RED,
+                total_failed,
+                COLOR_RESET
+        );
         std::printf("%s%s%s\n", COLOR_BOLD, SEP.data(), COLOR_RESET);
 
         return total_failed == 0;
@@ -216,6 +230,7 @@ namespace testing_framework {
         }
 
         if(!run_all()) return 1;
+        else return 0;
     }
 
     #define STRINGIFY(x) #x
