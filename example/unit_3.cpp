@@ -6,7 +6,7 @@ auto my_abs(int a) -> int {
 
 namespace tests::absolute {
 
-    Test my_abs_random_tests() {
+    void my_abs_random_tests() {
         expect_eq(my_abs(2), 2);
         expect_ne(my_abs(4), -4);
 

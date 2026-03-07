@@ -8,17 +8,12 @@
 #include <meta>
 #include <ranges>
 #include <tuple>
-#include <generator>
-
 
 //TODO: time testcases
 //TODO: improve formatting 
 //TODO: maybe add  more features
 
-
-namespace tests {
-    using Test = std::generator<const char*>;
-}
+namespace tests {}
 
 namespace testing_framework {
 
@@ -30,13 +25,16 @@ namespace testing_framework {
 
     constexpr std::string_view SEP = "========================================";
 
+    inline std::function<void(const char*)> current_yield = nullptr;
+    using TestFuncType = std::function<void(void)>;
+
     // nice c++ type system :)
     inline std::unordered_map<
         std::string_view, // test suite
         std::vector<
             std::tuple<
                 std::string_view, // test name
-                std::function<tests::Test(void)> // test function
+                TestFuncType // test function
             >
         >
     > all_tests;
@@ -51,10 +49,11 @@ namespace testing_framework {
                 | std::views::filter(is_namespace)
                 | std::ranges::to<std::vector>();
         };
+    
         std::size_t c = 0;
         template for (constexpr auto test_suite : [:reflect_constant_array(inner_namespaces(^^::tests)):]) {
             template for (constexpr auto test_case : [:reflect_constant_array(members_of(test_suite, ctx)):]) {
-                if constexpr (is_function(test_case) && return_type_of(test_case) == ^^tests::Test) {
+                if constexpr (is_function(test_case)) {
                     all_tests[identifier_of(test_suite)].emplace_back(
                         identifier_of(test_case),
                         &[:test_case:]
@@ -83,20 +82,22 @@ namespace testing_framework {
         }
     }
 
-    inline auto run(std::string_view name, std::function<tests::Test(void)> casefunc) -> bool {
+    inline auto run(std::string_view name, TestFuncType casefunc) -> bool {
 
         std::printf("%.*s ... ",
             static_cast<int>(name.length()), name.data()
         );
 
         std::size_t failed = 0;
-        for (auto e : casefunc()) {
+        current_yield = [&](const char* e) {
             failed++;
             if (failed == 1) {
                 std::printf("%s[failed]%s\n", COLOR_RED, COLOR_RESET);
             }
-            std::printf("\t%s%d) %s%s\n", COLOR_YELLOW, failed, e, COLOR_RESET);
-        }
+            std::printf("\t%s%zu) %s%s\n", COLOR_YELLOW, failed, e, COLOR_RESET);
+        };
+
+        casefunc();
 
         if (!failed) {
             std::printf("%s[passed]%s\n", COLOR_GREEN, COLOR_RESET);
@@ -219,19 +220,19 @@ namespace testing_framework {
 
     #define STRINGIFY(x) #x
     #define TOSTRING(x) STRINGIFY(x)
-    #define expect_eq(x, y) do{if((x) != (y)) co_yield "-> [ "#x" == "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__); } while(false);
-    #define expect_ne(x, y) do{if((x) == (y)) co_yield "-> [ "#x" != "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__); } while(false);
-    #define expect_streq(x, y) do{if(std::strcmp(x, y) != 0) co_yield "-> [ "#x" == "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__); } while(false);
-    #define expect_strne(x, y) do{if(std::strcmp(x, y) == 0) co_yield "-> [ "#x" != "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__); } while(false);
-    #define expect_true(statment) do{if(!(statment)) co_yield "-> [ "#statment" ] failed. " __FILE__ ":" TOSTRING(__LINE__); } while(false);
-    #define expect_false(statment) do{if((statment)) co_yield "-> [ "#statment" ] failed. " __FILE__ ":" TOSTRING(__LINE__); } while(false);
+    #define expect_eq(x, y) do{if((x) != (y)) testing_framework::current_yield( "-> [ "#x" == "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+    #define expect_ne(x, y) do{if((x) == (y)) testing_framework::current_yield( "-> [ "#x" != "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+    #define expect_streq(x, y) do{if(std::strcmp(x, y) != 0) testing_framework::current_yield( "-> [ "#x" == "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+    #define expect_strne(x, y) do{if(std::strcmp(x, y) == 0) testing_framework::current_yield( "-> [ "#x" != "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+    #define expect_true(statment) do{if(!(statment)) testing_framework::current_yield( "-> [ "#statment" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+    #define expect_false(statment) do{if((statment)) testing_framework::current_yield( "-> [ "#statment" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
     #define expect_any_throw(statment) do{ static bool ____i__ = false; try { statment } catch(...) { ____i__= true; } \
-                        if(!____i__) co_yield "-> [ `"#statment"` not throwing ]  " __FILE__ ":" TOSTRING(__LINE__); } while(false);
-    #define expect_throw(statment, type) do{ static bool ____i__ = false; try { statment } catch(const type e) { ____i__= true; } \
-                        if(!____i__) co_yield "-> [ `"#statment"` not throwing a `"#type"` ]  " __FILE__ ":" TOSTRING(__LINE__); } while(false);
+                        if(!____i__) testing_framework::current_yield( "-> [ `"#statment"` not throwing ]  " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+    #define expect_throw(statment, type) do{ static bool ____i__ = false; try { statment } catch(const type& e) { ____i__= true; } \
+                        if(!____i__) testing_framework::current_yield( "-> [ `"#statment"` not throwing a `"#type"` ]  " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
 
 }
 
 #ifdef TESTING_MAIN
-int  main(int argc, char** argv) { return testing_framework::main(argc, argv); }
+int main(int argc, char** argv) { return testing_framework::main(argc, argv); }
 #endif
