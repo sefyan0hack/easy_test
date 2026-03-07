@@ -1,7 +1,5 @@
+#define TESTING_MAIN
 #include "../testing.hpp"
-
-// main before the tests cases functions works ?? 
-int main(int argc, char** argv) { testing_framework::main(argc, argv); }
 
 auto my_add(int a, int b) -> int {
     return a + b;

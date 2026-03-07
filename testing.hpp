@@ -227,3 +227,6 @@ namespace testing_framework {
 
 }
 
+#ifdef TESTING_MAIN
+int  main(int argc, char** argv) { return testing_framework::main(argc, argv); }
+#endif
