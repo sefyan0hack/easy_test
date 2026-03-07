@@ -10,6 +10,12 @@
 #include <tuple>
 #include <generator>
 
+
+//TODO: time testcases
+//TODO: improve formatting 
+//TODO: maybe add  more features
+
+
 namespace tests {
     using Test = std::generator<const char*>;
 }
