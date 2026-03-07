@@ -1,4 +1,3 @@
-// g++ -std=c++26 -freflection
 #pragma once
 #include <functional>
 #include <string>
@@ -36,8 +35,8 @@ namespace testing_framework {
         >
     > all_tests;
 
-    template<std::meta::info namesp = ^^::tests, auto = [] {}>
-    auto collect_tests() -> size_t {
+    template<auto = [](){}>
+    inline auto collect_tests() -> size_t {
         using namespace std::meta;
         constexpr auto ctx = access_context::unprivileged();
 
@@ -47,7 +46,7 @@ namespace testing_framework {
                 | std::ranges::to<std::vector>();
         };
         std::size_t c = 0;
-        template for (constexpr auto test_suite : [:reflect_constant_array(inner_namespaces(namesp)):]) {
+        template for (constexpr auto test_suite : [:reflect_constant_array(inner_namespaces(^^::tests)):]) {
             template for (constexpr auto test_case : [:reflect_constant_array(members_of(test_suite, ctx)):]) {
                 if constexpr (is_function(test_case) && return_type_of(test_case) == ^^tests::Test) {
                     all_tests[identifier_of(test_suite)].emplace_back(
