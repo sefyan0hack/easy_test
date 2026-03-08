@@ -18,9 +18,9 @@ namespace testing {
     constexpr char const* COLOR_BOLD   = "\x1b[1m";
     constexpr char const* COLOR_RESET  = "\x1b[0m";
 
-    constexpr std::string_view SEP = "=====================================================";
+    constexpr std::string_view SEP = "===============================================";
 
-    inline std::function<void(const char*)> current_yield = nullptr;
+    inline std::function<void(const char* what, const char* file, int line)> current_yield = nullptr;
     using TestFuncType = std::function<void(void)>;
 
     // nice c++ type system :)
@@ -45,21 +45,18 @@ namespace testing {
                 | std::views::filter(has_identifier);
         };
 
-        constexpr auto get_namespace_reflection_name = [inner_namespaces_of](std::string_view s) -> info {
-            constexpr auto [...inner_ns] = [:reflect_constant_array(
-                inner_namespaces_of(^^::)
-            ):];
-
-            template for (constexpr auto ns : {inner_ns...}) {
-                if (identifier_of(ns) == s) return ns;
+        constexpr auto get_namespace_by_id = [inner_namespaces_of](std::string_view name, info in = ^^::) -> info {
+            for (auto ns : inner_namespaces_of(in)) {
+                if (identifier_of(ns) == name) return ns;
             }
-
-            throw "not found";
+            throw std::logic_error("namespace not found"); 
         };
 
         std::size_t c = 0;
 
-        constexpr auto [...test_suites] = [:reflect_constant_array(inner_namespaces_of(get_namespace_reflection_name("tests"))):];
+        constexpr info tests_namespace = get_namespace_by_id("tests");
+
+        constexpr auto [...test_suites] = [:reflect_constant_array(inner_namespaces_of(tests_namespace)):];
 
         template for (constexpr auto test_suite : {test_suites...}) {
             constexpr auto [...test_cases] = [:reflect_constant_array(members_of(test_suite, ctx)):];
@@ -101,12 +98,12 @@ namespace testing {
         );
 
         std::size_t failed = 0;
-        current_yield = [&](const char* e) {
+        current_yield = [&](const char* what, const char* file, int line) {
             failed++;
             if (failed == 1) {
                 std::printf("%s[failed]%s\n", COLOR_RED, COLOR_RESET);
             }
-            std::printf("\t%s%zu) %s%s\n", COLOR_YELLOW, failed, e, COLOR_RESET);
+            std::printf("\t%s%zu) -> %s faild.%s %s:%d\n", COLOR_YELLOW, failed, what, COLOR_RESET, file, line);
         };
     
         const auto t0 = std::chrono::steady_clock::now();
@@ -179,10 +176,11 @@ namespace testing {
         
         for (auto const& [suite_id, tests_vec] : all_tests) {
             total_suites++;
-            std::printf("%s%zu) %.*s%s\n",
+            std::printf("%s%zu) %.*s %.*s%s\n",
                         COLOR_BOLD,
                         total_suites,
                         static_cast<int>(suite_id.length()), suite_id.data(),
+                        static_cast<int>(SEP.length()), SEP.data(),
                         COLOR_RESET);
 
             for (auto const& test : tests_vec) {
@@ -199,13 +197,14 @@ namespace testing {
 
         // Summary footer
         std::printf("%s%s%s\n", COLOR_BOLD, SEP.data(), COLOR_RESET);
-        std::printf("Suites: %zu   Cases: %zu   %sSuccesses: %zu   %sFailures: %zu%s\n",
+        std::printf("Suites: %zu   %sSuccesses: %zu/%zu   %sFailures: %zu/%zu%s\n",
                 total_suites,
-                total_cases,
                 COLOR_GREEN,
                 total_cases - total_failed,
+                total_cases,
                 COLOR_RED,
                 total_failed,
+                total_cases,
                 COLOR_RESET
         );
         std::printf("%s%s%s\n", COLOR_BOLD, SEP.data(), COLOR_RESET);
@@ -245,18 +244,17 @@ namespace testing {
         else return 0;
     }
 
-    #define STRINGIFY(x) #x
-    #define TOSTRING(x) STRINGIFY(x)
-    #define expect_eq(x, y) do{if((x) != (y)) testing::current_yield( "-> [ "#x" == "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
-    #define expect_ne(x, y) do{if((x) == (y)) testing::current_yield( "-> [ "#x" != "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
-    #define expect_streq(x, y) do{if(std::strcmp(x, y) != 0) testing::current_yield( "-> [ "#x" == "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
-    #define expect_strne(x, y) do{if(std::strcmp(x, y) == 0) testing::current_yield( "-> [ "#x" != "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
-    #define expect_true(statment) do{if(!(statment)) testing::current_yield( "-> [ "#statment" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
-    #define expect_false(statment) do{if((statment)) testing::current_yield( "-> [ "#statment" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+
+    #define expect_eq(x, y) do{if((x) != (y)) testing::current_yield("[ "#x" == "#y" ]", __FILE__, __LINE__); } while(false);
+    #define expect_ne(x, y) do{if((x) == (y)) testing::current_yield("[ "#x" != "#y" ]", __FILE__, __LINE__); } while(false);
+    #define expect_streq(x, y) do{if(std::strcmp(x, y) != 0) testing::current_yield("[ "#x" == "#y" ]", __FILE__, __LINE__); } while(false);
+    #define expect_strne(x, y) do{if(std::strcmp(x, y) == 0) testing::current_yield("[ "#x" != "#y" ]", __FILE__, __LINE__); } while(false);
+    #define expect_true(statment) do{if(!(statment)) testing::current_yield("[ "#statment" ]", __FILE__, __LINE__); } while(false);
+    #define expect_false(statment) do{if((statment)) testing::current_yield("[ "#statment" ]", __FILE__, __LINE__); } while(false);
     #define expect_any_throw(statment) do{ static bool ____i__ = false; try { statment } catch(...) { ____i__= true; } \
-                        if(!____i__) testing::current_yield( "-> [ `"#statment"` not throwing ]  " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+                        if(!____i__) testing::current_yield("[ `"#statment"` not throwing ]", __FILE__, __LINE__); } while(false);
     #define expect_throw(statment, type) do{ static bool ____i__ = false; try { statment } catch(const type& e) { ____i__= true; } \
-                        if(!____i__) testing::current_yield( "-> [ `"#statment"` not throwing a `"#type"` ]  " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+                        if(!____i__) testing::current_yield("[ `"#statment"` not throwing a `"#type"` ]", __FILE__, __LINE__); } while(false);
 
 }
 
