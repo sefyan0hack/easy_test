@@ -10,12 +10,7 @@
 #include <tuple>
 #include <chrono>
 
-//TODO: improve formatting 
-//TODO: maybe add more features
-
-namespace tests {}
-
-namespace testing_framework {
+namespace testing {
 
     constexpr char const* COLOR_RED    = "\x1b[31m";
     constexpr char const* COLOR_GREEN  = "\x1b[32m";
@@ -44,15 +39,32 @@ namespace testing_framework {
         using namespace std::meta;
         constexpr auto ctx = access_context::unprivileged();
 
-        constexpr auto inner_namespaces = [](info ns) {
+        constexpr auto inner_namespaces_of = [](info ns) {
             return members_of(ns, ctx)
                 | std::views::filter(is_namespace)
-                | std::ranges::to<std::vector>();
+                | std::views::filter(has_identifier);
         };
-    
+
+        constexpr auto get_namespace_reflection_name = [inner_namespaces_of](std::string_view s) -> info {
+            constexpr auto [...inner_ns] = [:reflect_constant_array(
+                inner_namespaces_of(^^::)
+            ):];
+
+            template for (constexpr auto ns : {inner_ns...}) {
+                if (identifier_of(ns) == s) return ns;
+            }
+
+            throw "not found";
+        };
+
         std::size_t c = 0;
-        template for (constexpr auto test_suite : [:reflect_constant_array(inner_namespaces(^^::tests)):]) {
-            template for (constexpr auto test_case : [:reflect_constant_array(members_of(test_suite, ctx)):]) {
+
+        constexpr auto [...test_suites] = [:reflect_constant_array(inner_namespaces_of(get_namespace_reflection_name("tests"))):];
+
+        template for (constexpr auto test_suite : {test_suites...}) {
+            constexpr auto [...test_cases] = [:reflect_constant_array(members_of(test_suite, ctx)):];
+
+            template for (constexpr auto test_case : {test_cases...}) {
                 if constexpr (is_function(test_case)) {
                     all_tests[identifier_of(test_suite)].emplace_back(
                         identifier_of(test_case),
@@ -235,19 +247,19 @@ namespace testing_framework {
 
     #define STRINGIFY(x) #x
     #define TOSTRING(x) STRINGIFY(x)
-    #define expect_eq(x, y) do{if((x) != (y)) testing_framework::current_yield( "-> [ "#x" == "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
-    #define expect_ne(x, y) do{if((x) == (y)) testing_framework::current_yield( "-> [ "#x" != "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
-    #define expect_streq(x, y) do{if(std::strcmp(x, y) != 0) testing_framework::current_yield( "-> [ "#x" == "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
-    #define expect_strne(x, y) do{if(std::strcmp(x, y) == 0) testing_framework::current_yield( "-> [ "#x" != "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
-    #define expect_true(statment) do{if(!(statment)) testing_framework::current_yield( "-> [ "#statment" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
-    #define expect_false(statment) do{if((statment)) testing_framework::current_yield( "-> [ "#statment" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+    #define expect_eq(x, y) do{if((x) != (y)) testing::current_yield( "-> [ "#x" == "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+    #define expect_ne(x, y) do{if((x) == (y)) testing::current_yield( "-> [ "#x" != "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+    #define expect_streq(x, y) do{if(std::strcmp(x, y) != 0) testing::current_yield( "-> [ "#x" == "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+    #define expect_strne(x, y) do{if(std::strcmp(x, y) == 0) testing::current_yield( "-> [ "#x" != "#y" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+    #define expect_true(statment) do{if(!(statment)) testing::current_yield( "-> [ "#statment" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+    #define expect_false(statment) do{if((statment)) testing::current_yield( "-> [ "#statment" ] failed. " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
     #define expect_any_throw(statment) do{ static bool ____i__ = false; try { statment } catch(...) { ____i__= true; } \
-                        if(!____i__) testing_framework::current_yield( "-> [ `"#statment"` not throwing ]  " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+                        if(!____i__) testing::current_yield( "-> [ `"#statment"` not throwing ]  " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
     #define expect_throw(statment, type) do{ static bool ____i__ = false; try { statment } catch(const type& e) { ____i__= true; } \
-                        if(!____i__) testing_framework::current_yield( "-> [ `"#statment"` not throwing a `"#type"` ]  " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
+                        if(!____i__) testing::current_yield( "-> [ `"#statment"` not throwing a `"#type"` ]  " __FILE__ ":" TOSTRING(__LINE__)); } while(false);
 
 }
 
 #ifdef TESTING_MAIN
-int main(int argc, char** argv) { return testing_framework::main(argc, argv); }
+int main(int argc, char** argv) { return testing::main(argc, argv); }
 #endif
