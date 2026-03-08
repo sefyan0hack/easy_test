@@ -4,10 +4,9 @@
 #include <cstring>
 #include <unordered_map>
 #include <vector>
-#include <cstdio>
+#include <iostream>
 #include <meta>
 #include <ranges>
-#include <tuple>
 #include <chrono>
 
 namespace testing {
@@ -18,7 +17,7 @@ namespace testing {
     constexpr char const* COLOR_BOLD   = "\x1b[1m";
     constexpr char const* COLOR_RESET  = "\x1b[0m";
 
-    constexpr std::string_view SEP = "===============================================";
+    constexpr std::string_view SEP = "===================================================";
 
     inline std::function<void(const char* what, const char* file, int line)> current_yield = nullptr;
     using TestFuncType = std::function<void(void)>;
@@ -27,7 +26,7 @@ namespace testing {
     inline std::unordered_map<
         std::string_view, // test suite
         std::vector<
-            std::tuple<
+            std::pair<
                 std::string_view, // test name
                 TestFuncType // test function
             >
@@ -81,29 +80,22 @@ namespace testing {
     inline auto print_tests() -> void {
         for (auto const& [suite_id, tests_vec] : all_tests) {
             for (auto const& test : tests_vec) {
-                auto const& case_id = std::get<0>(test);
-
-                std::printf("%.*s.%.*s\n",
-                    static_cast<int>(suite_id.length()), suite_id.data(),
-                    static_cast<int>(case_id.length()), case_id.data()
-                );
+                std::cout << suite_id << '.' << std::get<0>(test) << std::endl;
             }
         }
     }
 
     inline auto run(std::string_view name, TestFuncType casefunc) -> bool {
-
-        std::printf("%.*s ... ",
-            static_cast<int>(name.length()), name.data()
-        );
+        
+        std::cout << name << " ... ";
 
         std::size_t failed = 0;
         current_yield = [&](const char* what, const char* file, int line) {
             failed++;
             if (failed == 1) {
-                std::printf("%s[failed]%s\n", COLOR_RED, COLOR_RESET);
+                std::cout << COLOR_RED << "[failed]" << COLOR_RESET << std::endl;
             }
-            std::printf("\t%s%zu) -> %s faild.%s %s:%d\n", COLOR_YELLOW, failed, what, COLOR_RESET, file, line);
+            std::cout << COLOR_YELLOW << "\t" << failed << ") -> " << what << " faild. " << COLOR_RESET << file << ":" << line << std::endl;
         };
     
         const auto t0 = std::chrono::steady_clock::now();
@@ -113,10 +105,11 @@ namespace testing {
         const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
 
         if (!failed) {
-            std::printf("%s[passed] (%lld ms)%s\n", COLOR_GREEN, ms, COLOR_RESET);
+            std::cout << COLOR_GREEN << "[passed] " << '(' << ms << " ms" << ')' << COLOR_RESET << std::endl;
             return true;
         }
 
+        std::cout << std::endl;
         return false;
     }
 
@@ -135,9 +128,7 @@ namespace testing {
         if (it != suite.end()) {
             return run(tcase_name, std::get<1>(*it));
         } else {
-            std::printf("`%.*s` not exist ",
-                static_cast<int>(fulltestname.length()), fulltestname.data()
-            );
+            std::cout << fulltestname << " not exist " << std::endl;
             return false;
         }
     }
@@ -146,68 +137,41 @@ namespace testing {
 
         std::size_t failed = 0;
 
-        for (auto const& test : all_tests.at(suite)) {
-            auto const& case_id = std::get<0>(test);
-            auto const& test_fn = std::get<1>(test);
-
+        for (auto const& [case_id, test_fn] : all_tests.at(suite)) {
             if(!run(case_id, test_fn)) failed++;
         }
+
         return failed == 0;
     }
 
     inline auto run_all() -> bool {
 
-        std::string text = "TESTS";
-        int sep_len = static_cast<int>(SEP.length());
-        int text_len = static_cast<int>(text.length());
-        
-        int padding = (sep_len > text_len) ? (sep_len - text_len) / 2 : 0;
-
-        std::puts("");
-        std::printf("%s%s%s\n", COLOR_BOLD, SEP.data(), COLOR_RESET);
-
-        std::printf("%s%*s%s%s\n", COLOR_BOLD, padding, "", text.c_str(), COLOR_RESET);
-        
-        std::printf("%s%s%s\n\n", COLOR_BOLD, SEP.data(), COLOR_RESET);
-
         std::size_t total_suites = 0;
         std::size_t total_cases  = 0;
         std::size_t total_failed = 0;
+
+        std::cout << std::endl;
         
         for (auto const& [suite_id, tests_vec] : all_tests) {
             total_suites++;
-            std::printf("%s%zu) %.*s %.*s%s\n",
-                        COLOR_BOLD,
-                        total_suites,
-                        static_cast<int>(suite_id.length()), suite_id.data(),
-                        static_cast<int>(SEP.length()), SEP.data(),
-                        COLOR_RESET);
+            std::cout << COLOR_BOLD << total_suites << ") "  << suite_id << ' ' << COLOR_RESET << SEP << std::endl;
 
-            for (auto const& test : tests_vec) {
-                auto const& case_id = std::get<0>(test);
-                auto const& test_fn = std::get<1>(test);
-
-                total_cases++;
-                std::printf("  %zu.%zu) ", total_suites, total_cases);
+            for (auto const& [case_id, test_fn] : tests_vec) {
+                std::cout << total_suites << '.' << ++total_cases << ") ";
                 if(!run(case_id, test_fn)) total_failed++;
             }
 
-            std::puts("");
+            std::cout << std::endl;
         }
 
         // Summary footer
-        std::printf("%s%s%s\n", COLOR_BOLD, SEP.data(), COLOR_RESET);
-        std::printf("Suites: %zu   %sSuccesses: %zu/%zu   %sFailures: %zu/%zu%s\n",
-                total_suites,
-                COLOR_GREEN,
-                total_cases - total_failed,
-                total_cases,
-                COLOR_RED,
-                total_failed,
-                total_cases,
-                COLOR_RESET
-        );
-        std::printf("%s%s%s\n", COLOR_BOLD, SEP.data(), COLOR_RESET);
+        std::cout << COLOR_BOLD << SEP << COLOR_RESET << std::endl;
+        std::cout 
+            << "   Suites: " << total_suites 
+            << COLOR_GREEN << "   Successes: " << total_cases - total_failed << '/' << total_cases << COLOR_RESET
+            << COLOR_RED << "   Failures: " << total_failed << '/' << total_cases << COLOR_RESET 
+        << std::endl;
+        std::cout << COLOR_BOLD << SEP << COLOR_RESET << std::endl;
 
         return total_failed == 0;
     }
@@ -219,7 +183,7 @@ namespace testing {
             return 0;
         } else if( argc > 1 && std::strcmp(argv[1], "--run") == 0) {
             if(!(argc > 2)) {
-                std::printf( "provide testsuite.testcase");
+                std::cout << "provide testsuite.testcase" << std::endl;
                 return 1;
             } else {
                 if(run_test(std::string_view{argv[2]})) return 0;
@@ -227,7 +191,8 @@ namespace testing {
             }
         } else if( argc > 1 && std::strcmp(argv[1], "--run-suite") == 0) {
             if(!(argc > 2)) {
-                std::printf( "provide testsuite");
+                std::cout << "provide testsuite" << std::endl;
+
                 return 1;
             } else {
                 if(run_suite(std::string_view{argv[2]})) return 0;
@@ -235,7 +200,8 @@ namespace testing {
             }
         } else {
             if(argc > 1){
-                std::printf("unknown option %s", argv[1]); 
+                std::cout << "unknown option" << argv[1] << std::endl;
+
                 return 1;
             }
         }
@@ -255,7 +221,6 @@ namespace testing {
                         if(!____i__) testing::current_yield("[ `"#statment"` not throwing ]", __FILE__, __LINE__); } while(false);
     #define expect_throw(statment, type) do{ static bool ____i__ = false; try { statment } catch(const type& e) { ____i__= true; } \
                         if(!____i__) testing::current_yield("[ `"#statment"` not throwing a `"#type"` ]", __FILE__, __LINE__); } while(false);
-
 }
 
 #ifdef TESTING_MAIN
