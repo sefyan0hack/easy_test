@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <vector>
 #include <iostream>
+#include <sstream>
 #include <meta>
 #include <ranges>
 #include <chrono>
@@ -88,14 +89,14 @@ namespace testing {
     inline auto run(std::string_view name, TestFuncType casefunc) -> bool {
         
         std::cout << name << " ... ";
+        std::vector<std::string> fails;
 
-        std::size_t failed = 0;
         current_yield = [&](const char* what, const char* file, int line) {
-            failed++;
-            if (failed == 1) {
-                std::cout << COLOR_RED << "[failed]" << COLOR_RESET << std::endl;
-            }
-            std::cout << COLOR_YELLOW << "\t" << failed << ") -> " << what << " faild. " << COLOR_RESET << file << ":" << line << std::endl;
+            static std::size_t failed = 0;
+            std::stringstream s;
+
+            s << COLOR_YELLOW << "\t" << ++failed << " -> " << what << " faild. " << COLOR_RESET << file << ":" << line;
+            fails.push_back(s.str());
         };
     
         const auto t0 = std::chrono::steady_clock::now();
@@ -104,13 +105,17 @@ namespace testing {
 
         const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
 
-        if (!failed) {
+        if(fails.empty()) {
             std::cout << COLOR_GREEN << "[passed] " << '(' << ms << " ms" << ')' << COLOR_RESET << std::endl;
             return true;
+        } else {
+            std::cout << COLOR_RED << "[failed] " << '(' << ms << " ms" << ')' << COLOR_RESET << std::endl;
+            for(const auto& e : fails){
+                std::cout << e << std::endl;
+            }
+            std::cout << std::endl;
+            return false;
         }
-
-        std::cout << std::endl;
-        return false;
     }
 
     inline auto run_test(std::string_view fulltestname) -> bool {
