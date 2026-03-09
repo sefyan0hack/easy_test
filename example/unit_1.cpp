@@ -1,4 +1,3 @@
-#define TESTING_MAIN
 #include "../testing.hpp"
 
 auto my_add(int a, int b) -> int {
