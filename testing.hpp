@@ -1,5 +1,4 @@
 #pragma once
-#include <functional>
 #include <string>
 #include <cstring>
 #include <unordered_map>
@@ -9,7 +8,7 @@
 
 namespace testing {
 
-    using TestFuncType = std::function<void(void)>;
+    using TestFuncType = void(void);
 
     // nice c++ type system :)
     inline std::unordered_map<
@@ -17,12 +16,12 @@ namespace testing {
         std::vector<
             std::pair<
                 std::string_view, // test name
-                TestFuncType // test function
+                TestFuncType* // test function
             >
         >
     > all_tests;
 
-    inline std::function<void(const char* what, const char* file, int line)> current_yield = nullptr;
+    auto current_yield(const char* what, const char* file, int line) -> void;
 
     template<auto = [](){}>
     inline auto collect_tests() -> size_t {

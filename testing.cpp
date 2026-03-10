@@ -1,5 +1,6 @@
 #include "testing.hpp"
 #include <iostream>
+#include <sstream>
 #include <chrono>
 
 namespace {
@@ -11,6 +12,8 @@ namespace {
 
     constexpr std::string_view SEP = "===================================================";
 
+    std::vector<std::string> current_yield_fails;
+
     auto print_tests() -> void {
         for (auto const& [suite_id, tests_vec] : testing::all_tests) {
             for (auto const& [test_id, func] : tests_vec) {
@@ -19,18 +22,7 @@ namespace {
         }
     }
 
-    auto run(std::string_view name, testing::TestFuncType casefunc) -> bool {
-        
-        std::cout << name << " ... ";
-        std::vector<std::string> fails;
-
-        testing::current_yield = [&](const char* what, const char* file, int line) {
-            static std::size_t failed = 0;
-            std::stringstream s;
-
-            s << COLOR_YELLOW << "\t" << ++failed << " -> " << what << " faild. " << COLOR_RESET << file << ":" << line;
-            fails.push_back(s.str());
-        };
+    auto run(std::string_view name, testing::TestFuncType* casefunc) -> bool {
     
         const auto t0 = std::chrono::steady_clock::now();
 
@@ -38,15 +30,17 @@ namespace {
 
         const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
 
-        if(fails.empty()) {
-            std::cout << COLOR_GREEN << "[passed] " << '(' << ms << " ms" << ')' << COLOR_RESET << std::endl;
+        if(current_yield_fails.empty()) {
+            std::cout << name << " ... " << COLOR_GREEN << "[passed] " << '(' << ms << " ms" << ')' << COLOR_RESET << std::endl;
             return true;
         } else {
-            std::cout << COLOR_RED << "[failed] " << '(' << ms << " ms" << ')' << COLOR_RESET << std::endl;
-            for(const auto& e : fails){
+            std::cout << name << " ... " << COLOR_RED  << "[failed] " << '(' << ms << " ms" << ')' << COLOR_RESET << std::endl;
+            for(const auto& e : current_yield_fails){
                 std::cout << e << std::endl;
             }
             std::cout << std::endl;
+
+            current_yield_fails.clear();
             return false;
         }
     }
@@ -95,7 +89,7 @@ namespace {
             std::cout << COLOR_BOLD << total_suites << ") "  << suite_id << ' ' << COLOR_RESET << SEP << std::endl;
 
             for (auto const& [case_id, test_fn] : tests_vec) {
-                std::cout << total_suites << '.' << ++total_cases << ") ";
+                std::cout << "  " << total_suites << '.' << ++total_cases << ") ";
                 if(!run(case_id, test_fn)) total_failed++;
             }
 
@@ -113,7 +107,16 @@ namespace {
 
         return total_failed == 0;
     }
+    
 }
+
+auto testing::current_yield(const char* what, const char* file, int line) -> void
+{
+    std::stringstream s;
+    s << COLOR_YELLOW << "\t" << current_yield_fails.size() + 1 << " -> " << what << " faild. " << COLOR_RESET << file << ":" << line;
+    current_yield_fails.push_back(s.str());
+}
+
 
 int main(int argc, char** argv) {
     if(argc > 1 && std::strcmp(argv[1], "--list") == 0){
