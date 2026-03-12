@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.30)
 
-project(testing LANGUAGES CXX)
-
-set(CMAKE_CXX_STANDARD 26)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+project(testing)
 
 add_library(testing)
 target_sources(testing
@@ -17,9 +13,11 @@ target_sources(testing
       FILES 
         ${CMAKE_CURRENT_SOURCE_DIR}/testing.hpp
 )
-target_compile_options(testing PUBLIC 
-    $<$<CXX_COMPILER_ID:GNU,Clang>:-freflection>
-    $<$<CXX_COMPILER_ID:Clang>:-fexpansion-statements>
+
+target_compile_features(testing PUBLIC cxx_std_26)
+target_compile_options(testing PUBLIC
+    $<$<CXX_COMPILER_ID:GNU>:-freflection>
+    $<$<CXX_COMPILER_ID:Clang>:-freflection-latest>
 )
 
 add_subdirectory(example)

@@ -3,7 +3,8 @@
 #include <sstream>
 #include <chrono>
 
-namespace {
+namespace testing::detail {
+
     constexpr char const* COLOR_RED    = "\x1b[31m";
     constexpr char const* COLOR_GREEN  = "\x1b[32m";
     constexpr char const* COLOR_YELLOW = "\x1b[33m";
@@ -15,14 +16,14 @@ namespace {
     std::vector<std::string> current_yield_fails;
 
     auto print_tests() -> void {
-        for (auto const& [suite_id, tests_vec] : testing::all_tests) {
+        for (auto const& [suite_id, tests_vec] : all_tests) {
             for (auto const& [test_id, func] : tests_vec) {
                 std::cout << suite_id << '.' << test_id << std::endl;
             }
         }
     }
 
-    auto run(std::string_view name, testing::TestFuncType* casefunc) -> bool {
+    auto run(std::string_view name, TestFuncType* casefunc) -> bool {
     
         const auto t0 = std::chrono::steady_clock::now();
 
@@ -54,7 +55,7 @@ namespace {
         auto tsuite_name = fulltestname.substr(0, pos);
         auto tcase_name  = fulltestname.substr(pos + 1);
 
-        auto suite = testing::all_tests.at(tsuite_name); //TODO: handle suite not exist
+        auto suite = all_tests.at(tsuite_name); //TODO: handle suite not exist
         auto it = std::ranges::find(suite, tcase_name, [](auto const& e){ return std::get<0>(e); });
 
         if (it != suite.end()) {
@@ -69,7 +70,7 @@ namespace {
 
         std::size_t failed = 0;
 
-        for (auto const& [case_id, test_fn] : testing::all_tests.at(suite)) {
+        for (auto const& [case_id, test_fn] : all_tests.at(suite)) {
             if(!run(case_id, test_fn)) failed++;
         }
 
@@ -84,7 +85,7 @@ namespace {
 
         std::cout << std::endl;
         
-        for (auto const& [suite_id, tests_vec] : testing::all_tests) {
+        for (auto const& [suite_id, tests_vec] : all_tests) {
             total_suites++;
             std::cout << COLOR_BOLD << total_suites << ") "  << suite_id << ' ' << COLOR_RESET << SEP << std::endl;
 
@@ -107,18 +108,20 @@ namespace {
 
         return total_failed == 0;
     }
-    
-}
 
-auto testing::current_yield(const char* what, const char* file, int line) -> void
-{
-    std::stringstream s;
-    s << COLOR_YELLOW << "\t" << current_yield_fails.size() + 1 << " -> " << what << " faild. " << COLOR_RESET << file << ":" << line;
-    current_yield_fails.push_back(s.str());
+    auto current_yield(std::string what, const char* file, int line) -> void
+    {
+        std::stringstream s;
+        s << COLOR_YELLOW << "\t" << current_yield_fails.size() + 1 << " -> " << what << " faild. " << COLOR_RESET << file << ":" << line;
+        current_yield_fails.push_back(s.str());
+    }
+
 }
 
 
 int main(int argc, char** argv) {
+    using namespace testing::detail;
+
     if(argc > 1 && std::strcmp(argv[1], "--list") == 0){
         print_tests();
         return 0;
