@@ -63,6 +63,9 @@ namespace testing {
             return c;
         }
 
+        // this only a hack for collecting all tests Across TUs `the lambda get called each time in each TU
+        // and calling collect_tests<unique>() so there is TU time of collect_tests function
+        // thanks to template<auto = [](){}> .
         [[maybe_unused]] static size_t TU_tests_count = [](){ return collect_tests(); }();
 
         auto current_yield(std::string what, const char* file, int line) -> void;
