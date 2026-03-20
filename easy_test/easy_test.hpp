@@ -74,28 +74,22 @@ namespace testing {
             return std::string("[ ") + body + " ]";
         }
 
-        template<typename A, typename B>
-        void check_eq(const A& a, const B& b, const char* expr, const char* file, int line) {
-            if constexpr (std::is_convertible_v<A, std::string_view> &&
-                        std::is_convertible_v<B, std::string_view>) {
-                if (std::string_view(a) != std::string_view(b))
-                    current_yield(make_msg(expr), file, line);
-            } else {
-                if (!(a == b))
-                    current_yield(make_msg(expr), file, line);
-            }
+        template<typename T>
+        inline void check_eq(const T& a, const T& b, const char* expr, const char* file, int line) {
+            if (!(a == b))  current_yield(make_msg(expr), file, line);
         }
 
-        template<typename A, typename B>
-        void check_ne(const A& a, const B& b, const char* expr, const char* file, int line) {
-            if constexpr (std::is_convertible_v<A, std::string_view> &&
-                        std::is_convertible_v<B, std::string_view>) {
-                if (std::string_view(a) == std::string_view(b))
-                    current_yield(make_msg(expr), file, line);
-            } else {
-                if (a == b)
-                    current_yield(make_msg(expr), file, line);
-            }
+        template<typename T>
+        inline void check_ne(const T& a, const T& b, const char* expr, const char* file, int line) {
+            if (a == b) current_yield(make_msg(expr), file, line);
+        }
+
+        inline void check_streq(const char* a, const char* b, const char* expr, const char* file, int line) {
+            if(std::strcmp(a, b) != 0) current_yield(make_msg(expr), file, line);
+        }
+
+        inline void check_strne(const char* a, const char* b, const char* expr, const char* file, int line) {
+            if (std::strcmp(a, b) == 0) current_yield(make_msg(expr), file, line);
         }
 
         inline void check_true(bool cond, const char* expr, const char* file, int line) {
@@ -103,14 +97,14 @@ namespace testing {
         }
 
         template<typename F>
-        void check_any_throw(F&& thunk, const char* expr, const char* file, int line) {
+        inline void check_any_throw(F&& thunk, const char* expr, const char* file, int line) {
             bool ok = false;
             try { std::forward<F>(thunk)(); } catch(...) { ok = true; }
             if (!ok) current_yield(std::string("[ `") + expr + "` not throwing ]", file, line);
         }
 
         template<typename Ex, typename F>
-        void check_throw(F&& thunk, const char* expr, const char* type_str, const char* file, int line) {
+        inline void check_throw(F&& thunk, const char* expr, const char* type_str, const char* file, int line) {
             bool ok = false;
             try { std::forward<F>(thunk)(); }
             catch (const Ex&) { ok = true; }
@@ -124,8 +118,8 @@ namespace testing {
 
 #define expect_eq(x,y)    testing::detail::check_eq((x),(y), #x " == " #y, __FILE__, __LINE__)
 #define expect_ne(x,y)    testing::detail::check_ne((x),(y), #x " != " #y, __FILE__, __LINE__)
-#define expect_streq(x,y) testing::detail::check_eq((x),(y), #x " == " #y, __FILE__, __LINE__)
-#define expect_strne(x,y) testing::detail::check_ne((x),(y), #x " != " #y, __FILE__, __LINE__)
+#define expect_streq(x,y) testing::detail::check_streq((x),(y), #x " == " #y, __FILE__, __LINE__)
+#define expect_strne(x,y) testing::detail::check_strne((x),(y), #x " != " #y, __FILE__, __LINE__)
 #define expect_true(e)    testing::detail::check_true(!!(e), #e, __FILE__, __LINE__)
 #define expect_false(e)   testing::detail::check_true(!(e), "!(" #e ")", __FILE__, __LINE__)
 #define expect_any_throw(stmt) testing::detail::check_any_throw([&](){ stmt; }, #stmt, __FILE__, __LINE__)
