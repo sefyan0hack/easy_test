@@ -1,4 +1,4 @@
-#include "../testing.hpp"
+#include <easy_test/testing.hpp>
 
 auto my_div(int a, int b) -> int {
     return a / b;

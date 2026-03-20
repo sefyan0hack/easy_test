@@ -14,7 +14,7 @@ target_sources(testing
       TYPE HEADERS
       BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
       FILES 
-        ${CMAKE_CURRENT_SOURCE_DIR}/testing.hpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/easy_test/testing.hpp
 )
 
 target_compile_features(testing PUBLIC cxx_std_26)

@@ -1,4 +1,4 @@
-#include "../testing.hpp"
+#include <easy_test/testing.hpp>
 
 auto my_abs(int a) -> int {
     return a >= 0 ? a : -a;
