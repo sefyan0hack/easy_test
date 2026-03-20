@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 3.30)
 
 project(testing)
 
+option(EASY_TEST_BUILD_EXAMPLES "Build Example Exe" OFF)
+
 add_library(testing)
+
 target_sources(testing
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/testing.cpp
@@ -20,4 +23,6 @@ target_compile_options(testing PUBLIC
     $<$<CXX_COMPILER_ID:Clang>:-freflection-latest>
 )
 
-add_subdirectory(example)
+if(EASY_TEST_BUILD_EXAMPLES)
+    add_subdirectory(example)
+endif()
