@@ -23,16 +23,12 @@ namespace testing {
         template<auto = [](){}>
         inline auto collect_tests() -> size_t {
             using namespace std::meta;
-            constexpr auto ctx = access_context::unprivileged();
+            constexpr auto ctx = access_context::unchecked();
 
-            constexpr auto inner_namespaces_of = [](info ns) {
-                return members_of(ns, ctx)
+            constexpr auto get_namespace_by_id = [](std::string_view name, info in = ^^::) -> info {
+                for (auto ns : members_of(in, ctx)
                     | std::views::filter(is_namespace)
-                    | std::views::filter(has_identifier);
-            };
-
-            constexpr auto get_namespace_by_id = [inner_namespaces_of](std::string_view name, info in = ^^::) -> info {
-                for (auto ns : inner_namespaces_of(in)) {
+                    | std::views::filter(has_identifier)) {
                     if (identifier_of(ns) == name) return ns;
                 }
                 return info{};
@@ -43,19 +39,17 @@ namespace testing {
             constexpr info tests_namespace = get_namespace_by_id("tests");
             if constexpr (tests_namespace != info{}) {
 
-                constexpr auto [...test_suites] = [:reflect_constant_array(inner_namespaces_of(tests_namespace)):];
+                constexpr auto [...test_suites] = [:reflect_constant_array(members_of(tests_namespace, ctx) | std::views::filter(is_namespace) | std::views::filter(has_identifier)):];
                 
                 template for (constexpr auto test_suite : {test_suites...}) {
-                    constexpr auto [...test_cases] = [:reflect_constant_array(members_of(test_suite, ctx)):];
-                    
+                    constexpr auto [...test_cases] = [:reflect_constant_array(members_of(test_suite, ctx) | std::views::filter(is_function)):];
+
                     template for (constexpr auto test_case : {test_cases...}) {
-                        if constexpr (is_function(test_case)) {
-                            all_tests[identifier_of(test_suite)].emplace_back(
-                                identifier_of(test_case),
-                                &[:test_case:]
-                            );
-                            c++;
-                        }
+                        all_tests[identifier_of(test_suite)].emplace_back(
+                            identifier_of(test_case),
+                            &[:test_case:]
+                        );
+                        c++;
                     }
                 }
             }
