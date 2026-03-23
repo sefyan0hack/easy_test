@@ -56,13 +56,18 @@ namespace testing::detail {
         auto tsuite_name = fulltestname.substr(0, pos);
         auto tcase_name  = fulltestname.substr(pos + 1);
 
-        auto suite = all_tests.at(tsuite_name); //TODO: handle suite not exist
-        auto it = std::ranges::find(suite, tcase_name, [](auto const& e){ return std::get<0>(e); });
-
-        if (it != suite.end()) {
-            return run(tcase_name, std::get<1>(*it));
-        } else {
-            std::cout << fulltestname << " not exist " << std::endl;
+        try {
+            auto suite = all_tests.at(tsuite_name);
+            auto it = std::ranges::find(suite, tcase_name, [](auto const& e){ return std::get<0>(e); });
+            
+            if (it != suite.end()) {
+                return run(tcase_name, std::get<1>(*it));
+            } else {
+                std::cout << fulltestname << " not exist " << std::endl;
+                return false;
+            }
+        } catch(...) {
+            std::cout << "test case `" << tsuite_name << " not exist" << std::endl;
             return false;
         }
     }
@@ -71,8 +76,13 @@ namespace testing::detail {
 
         std::size_t failed = 0;
 
-        for (auto const& [case_id, test_fn] : all_tests.at(suite)) {
-            if(!run(case_id, test_fn)) failed++;
+        try {
+            for (auto const& [case_id, test_fn] : all_tests.at(suite)) {
+                if(!run(case_id, test_fn)) failed++;
+            }
+        } catch(...) {
+            std::cout << "suite `" << suite << "` not exist" << std::endl;
+            return false;
         }
 
         return failed == 0;
