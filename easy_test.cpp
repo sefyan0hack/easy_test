@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include <chrono>
+#include <spanstream>
 
 namespace testing::detail {
 
@@ -116,40 +117,79 @@ namespace testing::detail {
         current_yield_fails.push_back(s.str());
     }
 
-}
+    template <class Opts>
+    auto cli_parse(int argc, char** argv) -> Opts {
+        using namespace std::meta;
 
+        std::vector<std::string_view> cmdline(argv+1, argv+argc);
+        constexpr auto ctx = std::meta::access_context::current();
+
+        constexpr auto help = [](char** argv){
+            std::cout << "Usage: " << argv[0] << " [options]" << std::endl;
+
+            std::cout << "options:" << std::endl;
+            template for (constexpr auto opt : std::define_static_array(nonstatic_data_members_of(^^Opts, ctx))) {
+                std::cout << "  --" << identifier_of(opt) << std::endl;
+            }
+        };
+
+        if(cmdline.empty()) help(argv);
+
+        Opts opts;
+
+        template for (constexpr auto opt : std::define_static_array(nonstatic_data_members_of(^^Opts, ctx))) {
+
+            auto it = std::ranges::find_if(cmdline,
+                [=](std::string_view arg){
+                return (arg.starts_with("--") && arg.substr(2) == identifier_of(opt));
+                });
+
+            if(it != cmdline.end())
+            {
+                if (it + 1 == cmdline.end() || (*(it+1)).starts_with("--")) {
+                    if constexpr (type_of(opt) == ^^bool){
+                        opts.[:opt:] = true;
+                        continue;
+                    } else {
+                        std::cerr << "Missing value for option " <<  display_string_of(opt) << std::endl;
+                        std::exit(EXIT_FAILURE);
+                    }
+                }
+
+                auto iss = std::ispanstream(*(it+1));
+                if (iss >> opts.[:opt:]; !iss) {
+                    std::cerr << "Failed to parse `" << *(it+1) << "` to type " <<  display_string_of(type_of(opt)) << std::endl;
+                    std::exit(EXIT_FAILURE);
+                }
+
+                cmdline.erase(it, it+2);
+            }
+        }
+        return opts;
+    }
+
+    struct CliOptions {
+        bool list = false;
+        std::string run = "*";
+    };
+
+}
 
 int main(int argc, char** argv) {
     using namespace testing::detail;
+    auto opts = cli_parse<CliOptions>(argc, argv);
 
-    if(argc > 1 && std::strcmp(argv[1], "--list") == 0){
-        print_tests();
-        return 0;
-    } else if( argc > 1 && std::strcmp(argv[1], "--run") == 0) {
-        if(!(argc > 2)) {
-            std::cout << "provide testsuite.testcase" << std::endl;
-            return 1;
-        } else {
-            if(run_test(std::string_view{argv[2]})) return 0;
-            return 1;
-        }
-    } else if( argc > 1 && std::strcmp(argv[1], "--run-suite") == 0) {
-        if(!(argc > 2)) {
-            std::cout << "provide testsuite" << std::endl;
+    if (opts.list) { print_tests(); return 0; }
 
-            return 1;
+    if (opts.run != "*"){
+        if (opts.run.contains(".")){
+            if(!run_test(opts.run)) return 1;
         } else {
-            if(run_suite(std::string_view{argv[2]})) return 0;
-            return 1;
+            if(!run_suite(opts.run)) return 1;
         }
     } else {
-        if(argc > 1){
-            std::cout << "unknown option" << argv[1] << std::endl;
-
-            return 1;
-        }
+        if(!run_all()) return 1;
     }
 
-    if(!run_all()) return 1;
-    else return 0;
+    return 0;
 }
