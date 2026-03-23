@@ -3,6 +3,7 @@
 #include <sstream>
 #include <chrono>
 #include <spanstream>
+#include <algorithm>
 
 namespace testing::detail {
 
@@ -128,22 +129,24 @@ namespace testing::detail {
     }
 
     template <class Opts>
-    auto cli_parse(int argc, char** argv) -> Opts {
+    auto cli_parse(int argc, char** argv, bool empty_opts_call_help = false) -> Opts {
         using namespace std::meta;
 
         std::vector<std::string_view> cmdline(argv+1, argv+argc);
         constexpr auto ctx = std::meta::access_context::current();
 
-        constexpr auto help = [](char** argv){
+        constexpr auto help_msg = [](char** argv){
             std::cout << "Usage: " << argv[0] << " [options]" << std::endl;
 
             std::cout << "options:" << std::endl;
             template for (constexpr auto opt : std::define_static_array(nonstatic_data_members_of(^^Opts, ctx))) {
                 std::cout << "  --" << identifier_of(opt) << std::endl;
             }
+            std::exit(EXIT_FAILURE);
         };
 
-        if(cmdline.empty()) help(argv);
+        if(empty_opts_call_help && cmdline.empty()) help_msg(argv);
+        if(std::ranges::contains(cmdline, std::string_view("--help")) || std::ranges::contains(cmdline, std::string_view("-h"))) help_msg(argv);
 
         Opts opts;
 
@@ -151,7 +154,7 @@ namespace testing::detail {
 
             auto it = std::ranges::find_if(cmdline,
                 [=](std::string_view arg){
-                return (arg.starts_with("--") && arg.substr(2) == identifier_of(opt));
+                    return (arg.starts_with("--") && arg.substr(2) == identifier_of(opt));
                 });
 
             if(it != cmdline.end())
@@ -191,7 +194,7 @@ int main(int argc, char** argv) {
 
     if (opts.list) { print_tests(); return 0; }
 
-    if (opts.run != "*"){
+    if (opts.run != "*") {
         if (opts.run.contains(".")){
             if(!run_test(opts.run)) return 1;
         } else {
