@@ -4,6 +4,7 @@
 #include <chrono>
 #include <spanstream>
 #include <algorithm>
+#include <functional>
 
 namespace testing::detail {
 
@@ -15,29 +16,49 @@ namespace testing::detail {
 
     constexpr std::string_view SEP = "===================================================";
 
-    std::vector<std::string> current_yield_fails;
+    thread_local std::vector<std::string> current_yield_fails;
 
-    auto print_tests() -> void {
-        for (auto const& [suite_id, tests_vec] : all_tests) {
-            for (auto const& [test_id, func] : tests_vec) {
-                std::cout << suite_id << '.' << test_id << std::endl;
-            }
-        }
+    auto current_yield(std::string what, const char* file, int line) -> void
+    {
+        std::stringstream s;
+        s << COLOR_YELLOW << "\t" << current_yield_fails.size() + 1 << " -> " << what << " faild. " << COLOR_RESET << file << ":" << line;
+        current_yield_fails.push_back(s.str());
+    }
+
+    auto tests_list() -> std::vector<std::string> {
+        return all_tests
+            | std::views::transform([](auto const& suite_pair) {
+                auto const& [suite_id, tests_vec] = suite_pair;
+                return tests_vec
+                    | std::views::transform([suite_id](auto const& test_pair) {
+                        auto const& [test_id, _] = test_pair;
+                        return std::string(suite_id) + std::string(".") + std::string(test_id);
+                    });
+            })
+            | std::views::join
+            | std::ranges::to<std::vector>();
+    }
+
+    template<class F, class... Args>
+        requires std::invocable<F, Args...>
+    auto execution_time_of(F&& func, Args&&... args) -> std::chrono::milliseconds
+    {
+        const auto t0 = std::chrono::steady_clock::now();
+        std::invoke(std::forward<F>(func), std::forward<Args>(args)...);
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - t0
+        );
     }
 
     auto run(std::string_view name, TestFuncType* casefunc) -> bool {
-    
-        const auto t0 = std::chrono::steady_clock::now();
 
-        casefunc();
-
-        const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
+        const auto ms = execution_time_of(casefunc);
 
         if(current_yield_fails.empty()) {
-            std::cout << name << " ... " << COLOR_GREEN << "[passed] " << '(' << ms << " ms" << ')' << COLOR_RESET << std::endl;
+            std::cout << name << " ... " << COLOR_GREEN << "[passed] " << '(' << ms << ')' << COLOR_RESET << std::endl;
             return true;
         } else {
-            std::cout << name << " ... " << COLOR_RED  << "[failed] " << '(' << ms << " ms" << ')' << COLOR_RESET << std::endl;
+            std::cout << name << " ... " << COLOR_RED  << "[failed] " << '(' << ms << ')' << COLOR_RESET << std::endl;
             for(const auto& e : current_yield_fails){
                 std::cout << e << std::endl;
             }
@@ -51,8 +72,7 @@ namespace testing::detail {
     auto run_test(std::string_view fulltestname) -> bool {
 
         auto pos = fulltestname.find('.');
-        if (pos == std::string_view::npos)
-            throw std::runtime_error("Invalid test format");
+        if (pos == std::string_view::npos) return false;
 
         auto tsuite_name = fulltestname.substr(0, pos);
         auto tcase_name  = fulltestname.substr(pos + 1);
@@ -96,7 +116,7 @@ namespace testing::detail {
         std::size_t total_failed = 0;
 
         std::cout << std::endl;
-        
+
         for (auto const& [suite_id, tests_vec] : all_tests) {
             total_suites++;
             std::cout << COLOR_BOLD << total_suites << ") "  << suite_id << ' ' << COLOR_RESET << SEP << std::endl;
@@ -121,20 +141,10 @@ namespace testing::detail {
         return total_failed == 0;
     }
 
-    auto current_yield(std::string what, const char* file, int line) -> void
-    {
-        std::stringstream s;
-        s << COLOR_YELLOW << "\t" << current_yield_fails.size() + 1 << " -> " << what << " faild. " << COLOR_RESET << file << ":" << line;
-        current_yield_fails.push_back(s.str());
-    }
-    struct help_m {
+    struct help {
         char const* msg;
+        template<std::size_t N> consteval help(const char (&m)[N]) : msg(std::define_static_string(m)) {}
     };
-
-    consteval auto help(std::string_view m) -> help_m
-    {
-        return help_m { std::define_static_string(m) };
-    }
 
     template <class Opts>
     auto print_help(char** argv) -> void
@@ -166,8 +176,8 @@ namespace testing::detail {
             std::cout << std::string(padding, ' ');
 
             bool first = true;
-            template for (constexpr auto annot : std::define_static_array(annotations_of_with_type(opt, ^^help_m))) {
-            std::string_view desc = extract<help_m>(annot).msg;
+            template for (constexpr auto annot : std::define_static_array(annotations_of_with_type(opt, ^^help))) {
+            std::string_view desc = extract<help>(annot).msg;
             if (first) {
                 std::cout << desc << '\n';
                 first = false;
@@ -237,7 +247,10 @@ int main(int argc, char** argv) {
     using namespace testing::detail;
     auto opts = cli_parse<CliOptions>(argc, argv);
 
-    if (opts.list) { print_tests(); return 0; }
+    if (opts.list) {
+        for(auto id: tests_list()) std::cout << id << std::endl;
+        return 0;
+    }
 
     if (opts.run != "*") {
         if (opts.run.contains(".")){
