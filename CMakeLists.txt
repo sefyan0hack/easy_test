@@ -24,5 +24,6 @@ target_compile_options(easy_test PUBLIC
 )
 
 if(EASY_TEST_BUILD_EXAMPLES)
+    enable_testing()
     add_subdirectory(example)
 endif()
